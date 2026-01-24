@@ -2,54 +2,48 @@ services:
   qwen-server:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     environment:
-      # Server Configuration
-      - LLAMA_ARG_HOST=0.0.0.0
-      - LLAMA_ARG_PORT=8080
-      # Model Configuration
-      - LLAMA_ARG_MODEL=/models/qwen2.5-coder-32b-instruct-q5_k_m.gguf
-      - LLAMA_ARG_ALIAS=qwencoder
-      - LLAMA_ARG_CTX_SIZE=16384
-      # Performance
-      - LLAMA_ARG_N_PARALLEL=4
-      - LLAMA_ARG_THREADS=12
-      - LLAMA_ARG_THREADS_BATCH=12
-      - LLAMA_ARG_NO_MMAP=false
-      # GPU support
-      - LLAMA_ARG_N_GPU_LAYERS=38
-      - LLAMA_ARG_FLASH_ATTN=on
-      - LLAMA_ARG_KV_UNIFIED=true
-      - LLAMA_ARG_MAIN_GPU=0
-      - LLAMA_ARG_CONT_BATCHING=true
-      # - LLAMA_ARG_ROPE_SCALING=linear
-      # - LLAMA_ARG_CACHE_TYPE_K=q4_0
-      # - LLAMA_ARG_CACHE_TYPE_V=q4_0
-      # - LLAMA_ARG_ROPE_SCALE=2
-      # - LLAMA_ARG_SPLIT_MODE=layer
-      # - LLAMA_ARG_METRICS=true
-      # - LLAMA_ARG_TIMEOUT=300
-      # Sampling Parameters
-      # - LLAMA_ARG_TEMP=0.8
-      # - LLAMA_ARG_TOP_K=40
-      # - LLAMA_ARG_TOP_P=0.9
-      # - LLAMA_ARG_REPEAT_LAST_N=64
-      # - LLAMA_ARG_REPEAT_PENALTY=1.0
-      # - LLAMA_ARG_PRESENCE_PENALTY=0.0
-      # - LLAMA_ARG_FREQUENCY_PENALTY=0.0
-      # - LLAMA_ARG_DRAFT_MAX=16
-      # - LLAMA_ARG_DRAFT_MIN=0
-      # - LLAMA_ARG_DRAFT_P_MIN=0.8
-      # - LLAMA_ARG_CTX_SIZE_DRAFT=16384
-      # - LLAMA_ARG_N_GPU_LAYERS_DRAFT=38
+      # Конфигурация сервера
+      - LLAMA_ARG_HOST=0.0.0.0 # сервер слушает на всех интерфейсах
+      - LLAMA_ARG_PORT=8080 # порт для подключения
+      - LLAMA_ARG_THREADS_HTTP=16 # количество потоков для обработки HTTP-запросов
+      # Конфигурация модели
+      - LLAMA_ARG_MODEL=/models/qwen2.5-coder-32b-instruct-q5_k_m.gguf # путь к модели
+      - LLAMA_ARG_ALIAS=qwencoder # псевдоним модели
+      # Параллелизм и потоки
+      - LLAMA_ARG_THREADS=12 # потоков для вычислений
+      - LLAMA_ARG_THREADS_BATCH=12 # потоков для пакетной обработки
+      - LLAMA_ARG_N_PARALLEL=4 # параллельных запросов
+      # Контекст и память
+      - LLAMA_ARG_CTX_SIZE=16384 # размер контекста
+      - LLAMA_ARG_NO_MMAP=false # используем маппинг файлов в память
+      # GPU настройки
+      - LLAMA_ARG_N_GPU_LAYERS=38 # загружаем 38 слоёв модели на GPU
+      # Дополнительные настройки
+      - LLAMA_ARG_NO_KV_OFFLOAD=false # включаем offload KV для лучшего использования GPU
+      - LLAMA_ARG_MLOCK=true # форсимируем систему держать модель в RAM, чтобы избежать свопинга и сжатия
+      # Дополнительные оптимизации
+      - LLAMA_ARG_FLASH_ATTN=auto # используем Flash Attention, если поддерживается
+      - LLAMA_ARG_KV_UNIFIED=true # единый буфер кэша KV для всех последовательностей
     volumes:
       - ./models:/models
       - ./cache:/build/cache
     ports:
       - "8080:8080"
+    cap_add:
+      - IPC_LOCK
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    shm_size: "64gb"
+    security_opt:
+      - label=disable
+      - seccomp=unconfined
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: all
               capabilities: [gpu]
     restart: unless-stopped
