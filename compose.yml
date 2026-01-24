@@ -1,6 +1,6 @@
 services:
   qwen-server:
-    image: ghcr.io/ggerganov/llama.cpp:full-cuda-12
+    image: ghcr.io/ggml-org/llama.cpp:full-cuda
     restart: unless-stopped
     deploy:
       resources:
