@@ -1,7 +1,3 @@
-
-подбери наиболее оптимальные параметры для моей аппаратной платформы и обнови мою композицию:
-
-```
 services:
   qwen-server:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
@@ -57,4 +53,3 @@ services:
               count: 1
               capabilities: [gpu]
     restart: unless-stopped
-```
