@@ -8,8 +8,9 @@ services:
       # Server Configuration
       - LLAMA_ARG_HOST=0.0.0.0
       - LLAMA_ARG_PORT=8080
-      - LLAMA_ARG_CTX_SIZE=2048
-      - LLAMA_ARG_N_PARALLEL=4
+      - LLAMA_ARG_CTX_SIZE=16384
+      - LLAMA_ARG_N_PARALLEL=1
+      - LLAMA_ARG_THREADS=12
       # Embeddings-specific
       - LLAMA_ARG_EMBEDDINGS=true
       - LLAMA_ARG_POOLING=mean
