@@ -1,5 +1,5 @@
 services:
-  qwen-server:
+  llama_cpp:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     environment:
       # Конфигурация сервера
@@ -14,10 +14,10 @@ services:
       - LLAMA_ARG_THREADS_BATCH=12 # потоков для пакетной обработки
       - LLAMA_ARG_N_PARALLEL=4 # параллельных запросов
       # Контекст и память
-      - LLAMA_ARG_CTX_SIZE=16384 # размер контекста
+      - LLAMA_ARG_CTX_SIZE=32768 # размер контекста
       - LLAMA_ARG_NO_MMAP=false # используем маппинг файлов в память
       # GPU настройки
-      - LLAMA_ARG_N_GPU_LAYERS=38 # загружаем 38 слоёв модели на GPU
+      - LLAMA_ARG_N_GPU_LAYERS=99 # загружаем 38 слоёв модели на GPU
       # Дополнительные настройки
       - LLAMA_ARG_NO_KV_OFFLOAD=false # включаем offload KV для лучшего использования GPU
       - LLAMA_ARG_MLOCK=true # форсимируем систему держать модель в RAM, чтобы избежать свопинга и сжатия
@@ -25,8 +25,8 @@ services:
       - LLAMA_ARG_FLASH_ATTN=auto # используем Flash Attention, если поддерживается
       - LLAMA_ARG_KV_UNIFIED=true # единый буфер кэша KV для всех последовательностей
     volumes:
-      - ./models:/models
-      - ./cache:/build/cache
+      - ./llama_cpp_models:/models
+      - ./llama_cpp_cache:/build/cache
     ports:
       - "8080:8080"
     cap_add:
@@ -45,5 +45,5 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
+              capabilities: [ gpu ]
     restart: unless-stopped
