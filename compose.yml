@@ -8,7 +8,7 @@ services:
       # Model Configuration
       - LLAMA_ARG_MODEL=/models/qwen2.5-coder-32b-instruct-q5_k_m.gguf
       - LLAMA_ARG_ALIAS=qwencoder
-      - LLAMA_ARG_CTX_SIZE=8192
+      - LLAMA_ARG_CTX_SIZE=16384
       # Performance
       - LLAMA_ARG_N_PARALLEL=4
       - LLAMA_ARG_THREADS=12
@@ -38,7 +38,7 @@ services:
       - LLAMA_ARG_DRAFT_MAX=16
       - LLAMA_ARG_DRAFT_MIN=0
       - LLAMA_ARG_DRAFT_P_MIN=0.8
-      - LLAMA_ARG_CTX_SIZE_DRAFT=8192
+      - LLAMA_ARG_CTX_SIZE_DRAFT=16384
       - LLAMA_ARG_N_GPU_LAYERS_DRAFT=38
     volumes:
       - ./models:/models
