@@ -1,7 +1,28 @@
 services:
   qwen-server:
-    image: ghcr.io/ggml-org/llama.cpp:full-cuda
-    restart: unless-stopped
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    environment:
+      # Model Configuration
+      - LLAMA_ARG_MODEL=/models/qwen2.5-coder-32b-instruct-q5_k_m.gguf
+      - LLAMA_ARG_ALIAS=qwencoder
+      # Server Configuration
+      - LLAMA_ARG_HOST=0.0.0.0
+      - LLAMA_ARG_PORT=8080
+      - LLAMA_ARG_CTX_SIZE=2048
+      - LLAMA_ARG_N_PARALLEL=4
+      # Embeddings-specific
+      - LLAMA_ARG_EMBEDDINGS=true
+      - LLAMA_ARG_POOLING=mean
+      # Performance
+      - LLAMA_ARG_THREADS=-1
+      - LLAMA_ARG_NO_MMAP=false
+      # GPU support
+      - LLAMA_ARG_N_GPU_LAYERS=40
+    volumes:
+      - ./models:/models
+      - ./cache:/build/cache
+    ports:
+      - "8080:8080"
     deploy:
       resources:
         reservations:
@@ -9,22 +30,4 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    volumes:
-      - ./models:/models
-      - ./cache:/build/cache
-    ports:
-      - "8080:8080"
-    command: >
-      --server
-      -m /models/qwen2.5-32b-instruct-q5_k_m.gguf
-      --host 0.0.0.0 --port 8080
-      --ctx-size 16384 --batch-size 512
-      --n-gpu-layers 38
-      --mlock 40
-      --tensor-split "0,100"
-      --threads 12
-      --rpc
-      --embedding
-      --log-disable
-      --verbose-prompt
-  
+    restart: unless-stopped
