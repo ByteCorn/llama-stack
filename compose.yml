@@ -10,20 +10,21 @@ services:
       - LLAMA_ARG_ALIAS=qwencoder
       - LLAMA_ARG_CTX_SIZE=16384
       # Performance
-      - LLAMA_ARG_N_PARALLEL=1
+      - LLAMA_ARG_N_PARALLEL=4
       - LLAMA_ARG_THREADS=12
-      # - LLAMA_ARG_THREADS_BATCH=12
+      - LLAMA_ARG_THREADS_BATCH=12
+      - LLAMA_ARG_NO_MMAP=false
       # GPU support
       - LLAMA_ARG_N_GPU_LAYERS=38
       - LLAMA_ARG_FLASH_ATTN=on
       - LLAMA_ARG_KV_UNIFIED=true
-      - LLAMA_ARG_ROPE_SCALING=linear
+      - LLAMA_ARG_MAIN_GPU=0
+      - LLAMA_ARG_CONT_BATCHING=true
+      # - LLAMA_ARG_ROPE_SCALING=linear
       # - LLAMA_ARG_CACHE_TYPE_K=q4_0
       # - LLAMA_ARG_CACHE_TYPE_V=q4_0
       # - LLAMA_ARG_ROPE_SCALE=2
       # - LLAMA_ARG_SPLIT_MODE=layer
-      # - LLAMA_ARG_MAIN_GPU=0
-      # - LLAMA_ARG_CONT_BATCHING=true
       # - LLAMA_ARG_METRICS=true
       # - LLAMA_ARG_TIMEOUT=300
       # Sampling Parameters
