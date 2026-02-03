@@ -7,7 +7,7 @@ services:
       - LLAMA_ARG_PORT=8080 # порт для подключения
       - LLAMA_ARG_THREADS_HTTP=16 # количество потоков для обработки HTTP-запросов
       # Конфигурация модели
-      - LLAMA_ARG_MODEL=/models/qwen2.5-coder-32b-instruct-q5_k_m.gguf # путь к модели
+      - LLAMA_ARG_MODEL=/models/Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M.gguf # путь к модели
       - LLAMA_ARG_ALIAS=qwencoder # псевдоним модели
       # Параллелизм и потоки
       - LLAMA_ARG_THREADS=12 # потоков для вычислений
