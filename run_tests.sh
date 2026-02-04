@@ -48,7 +48,7 @@ for model in "${MODELS[@]}"; do
     if [ -f "$code_file" ]; then
       echo "--> Тестируем на файле: $code_file"
       # Добавляем флаг -fa для ускорения на твоей 3090 Ti
-      $PPL_BIN -m "/models/$model" -f "$code_file" -c 4096 -ngl $CURRENT_NGL -fa
+      $PPL_BIN -m "/models/$model" -f "$code_file" -c 4096 -ngl $CURRENT_NGL -fa auto
     else
       echo "⚠️ Файл $code_file не найден!"
     fi
