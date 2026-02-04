@@ -1,5 +1,14 @@
+x-logging-gelf: &gelf-logging
+  logging:
+    driver: gelf
+    options:
+      gelf-address: "udp://172.17.0.1:12201" # Graylog порт из стека логирования
+      tag: "llm-{{.Name}}" # автоматически добавит имя контейнера в тег
+
+
 services:
   llama_cpp:
+    <<: *gelf-logging
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     environment:
       # Конфигурация сервера
