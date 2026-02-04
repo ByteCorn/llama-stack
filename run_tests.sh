@@ -1,11 +1,10 @@
 #!/bin/bash
 
-# Прямые пути к бинарникам в образе ghcr.io/ggml-org/llama.cpp:server-cuda
-BENCH_BIN="/app/build/bin/llama-bench"
-PPL_BIN="/app/build/bin/llama-perplexity"
+# Прямые пути к бинарникам
+BENCH_BIN="/app/llama-bench"
+PPL_BIN="/app/llama-perplexity"
 
-
-# Список твоих моделей
+# Список моделей
 MODELS=(
   "qwen2.5-coder-32b-instruct-q5_k_m.gguf"
   "Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M.gguf"
@@ -28,9 +27,19 @@ for model in "${MODELS[@]}"; do
   echo "🟡 ТЕСТИРУЕМ: $model"
   echo "----------------------------------------------------------------"
 
+  # Динамическое определение слоев (NGL)
+  # Для 32B ставим 99 (влезет целиком), для 70B ставим 43 (частичный оффлоад)
+  if [[ $model == *"70b"* || $model == *"70B"* ]]; then
+     CURRENT_NGL=43
+     echo "📦 Обнаружена тяжелая модель (70B). Устанавливаю NGL=$CURRENT_NGL для предотвращения OOM."
+  else
+     CURRENT_NGL=99
+     echo "⚡ Модель среднего размера. Устанавливаю NGL=$CURRENT_NGL (полный GPU-оффлоад)."
+  fi
+
   # 1. Замер скорости
   echo "[1/2] Замер производительности (llama-bench)..."
-  $BENCH_BIN -m "/models/$model" -p 512 -n 128 -ngl 99
+  $BENCH_BIN -m "/models/$model" -p 512 -n 128 -ngl $CURRENT_NGL
   
   echo ""
   echo "[2/2] Замер качества кода (llama-perplexity)..."
@@ -38,8 +47,8 @@ for model in "${MODELS[@]}"; do
   for code_file in "${CODE_FILES[@]}"; do
     if [ -f "$code_file" ]; then
       echo "--> Тестируем на файле: $code_file"
-      # -c 4096: оптимальное окно для замера логики
-      $PPL_BIN -m "/models/$model" -f "$code_file" -c 4096 -ngl 99
+      # Добавляем флаг -fa для ускорения на твоей 3090 Ti
+      $PPL_BIN -m "/models/$model" -f "$code_file" -c 4096 -ngl $CURRENT_NGL -fa
     else
       echo "⚠️ Файл $code_file не найден!"
     fi
