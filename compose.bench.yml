@@ -49,4 +49,11 @@ services:
             - driver: nvidia
               count: all
               capabilities: [ gpu ]
+    extra_hosts:
+      - "logger.local:host-gateway"
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logger.local:12201" # Graylog порт из стека логирования
+        tag: "llama-cpp-inference"
     restart: unless-stopped
