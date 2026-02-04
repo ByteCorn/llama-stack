@@ -1,0 +1,52 @@
+services:
+  llama_cpp_bench:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    environment:
+      # Конфигурация сервера
+      - LLAMA_ARG_HOST=0.0.0.0 # сервер слушает на всех интерфейсах
+      - LLAMA_ARG_PORT=8080 # порт для подключения
+      - LLAMA_ARG_THREADS_HTTP=16 # количество потоков для обработки HTTP-запросов
+      # Конфигурация модели
+      - LLAMA_ARG_MODEL=/models/Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M.gguf # путь к модели
+      - LLAMA_ARG_ALIAS=qwencoder # псевдоним модели
+      # Параллелизм и потоки
+      - LLAMA_ARG_THREADS=12 # потоков для вычислений
+      - LLAMA_ARG_THREADS_BATCH=12 # потоков для пакетной обработки
+      - LLAMA_ARG_N_PARALLEL=4 # параллельных запросов
+      # Контекст и память
+      - LLAMA_ARG_CTX_SIZE=32768 # размер контекста
+      - LLAMA_ARG_NO_MMAP=false # используем маппинг файлов в память
+      # GPU настройки
+      - LLAMA_ARG_N_GPU_LAYERS=99 # загружаем 38 слоёв модели на GPU
+      # Дополнительные настройки
+      - LLAMA_ARG_NO_KV_OFFLOAD=false # включаем offload KV для лучшего использования GPU
+      - LLAMA_ARG_MLOCK=true # форсимируем систему держать модель в RAM, чтобы избежать свопинга и сжатия
+      # Дополнительные оптимизации
+      - LLAMA_ARG_FLASH_ATTN=auto # используем Flash Attention, если поддерживается
+      - LLAMA_ARG_KV_UNIFIED=true # единый буфер кэша KV для всех последовательностей
+    entrypoint: ["/bin/bash", "/run_tests.sh"]
+    volumes:
+      - ./llama_cpp_models:/models
+      - ./llama_cpp_cache:/build/cache
+      - ./run_tests.sh:/run_tests.sh
+      - ./codes:/codes
+    ports:
+      - "8080:8080"
+    cap_add:
+      - IPC_LOCK
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    shm_size: "64gb"
+    security_opt:
+      - label=disable
+      - seccomp=unconfined
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    restart: unless-stopped
