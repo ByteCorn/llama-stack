@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Прямые пути к бинарникам в образе ghcr.io/ggml-org/llama.cpp:server-cuda
+BENCH_BIN="/app/build/bin/llama-bench"
+PPL_BIN="/app/build/bin/llama-perplexity"
+
+
 # Список твоих моделей
 MODELS=(
   "qwen2.5-coder-32b-instruct-q5_k_m.gguf"
@@ -25,7 +30,7 @@ for model in "${MODELS[@]}"; do
 
   # 1. Замер скорости
   echo "[1/2] Замер производительности (llama-bench)..."
-  /llama-bench -m "/models/$model" -p 512 -n 128 -ngl 99
+  $BENCH_BIN -m "/models/$model" -p 512 -n 128 -ngl 99
   
   echo ""
   echo "[2/2] Замер качества кода (llama-perplexity)..."
@@ -34,7 +39,7 @@ for model in "${MODELS[@]}"; do
     if [ -f "$code_file" ]; then
       echo "--> Тестируем на файле: $code_file"
       # -c 4096: оптимальное окно для замера логики
-      /llama-perplexity -m "/models/$model" -f "$code_file" -c 4096 -ngl 99
+      $PPL_BIN -m "/models/$model" -f "$code_file" -c 4096 -ngl 99
     else
       echo "⚠️ Файл $code_file не найден!"
     fi
