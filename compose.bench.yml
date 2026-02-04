@@ -50,10 +50,10 @@ services:
               count: all
               capabilities: [ gpu ]
     extra_hosts:
-      - "logger.local:host-gateway"
+      - "host.docker.internal:host-gateway"
     logging:
       driver: gelf
       options:
-        gelf-address: "udp://172.17.0.1:12201"  # Graylog порт из стека логирования
+        gelf-address: "udp://host.docker.internal:12201"  # Graylog порт из стека логирования
         tag: "llama-cpp-inference"
     restart: unless-stopped
