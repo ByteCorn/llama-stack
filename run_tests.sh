@@ -13,9 +13,9 @@ MODELS=(
 )
 
 # Файлы для тестирования Perplexity (PPL)
-CODE_FILES=(
-  "/codes/sat_solver.lean"
-  "/codes/role.py"
+CORPUS_FILES=(
+  "/corpus/lean_corpus.txt"
+  "/corpus/python_corpus.txt"
 )
 
 echo "================================================================"
@@ -44,13 +44,13 @@ for model in "${MODELS[@]}"; do
   echo ""
   echo "[2/2] Замер качества кода (llama-perplexity)..."
   
-  for code_file in "${CODE_FILES[@]}"; do
-    if [ -f "$code_file" ]; then
-      echo "--> Тестируем на файле: $code_file"
+  for corpus_file in "${CORPUS_FILES[@]}"; do
+    if [ -f "$corpus_file" ]; then
+      echo "--> Тестируем на файле: $corpus_file"
       # Добавляем флаг -fa для ускорения на твоей 3090 Ti
-      $PPL_BIN -m "/models/$model" -f "$code_file" -c 4096 -ngl $CURRENT_NGL -fa auto
+      $PPL_BIN -m "/models/$model" -f "$corpus_file" -c 131072 -ngl $CURRENT_NGL -fa auto
     else
-      echo "⚠️ Файл $code_file не найден!"
+      echo "⚠️ Файл $corpus_file не найден!"
     fi
     echo ""
   done

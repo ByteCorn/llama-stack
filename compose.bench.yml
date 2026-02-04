@@ -37,7 +37,7 @@ services:
       - ./llama_cpp_models:/models
       - ./llama_cpp_cache:/build/cache
       - ./run_tests.sh:/run_tests.sh
-      - ./codes:/codes
+      - ./corpus:/corpus
     ports:
       - "8080:8080"
     cap_add:
@@ -57,11 +57,4 @@ services:
             - driver: nvidia
               count: all
               capabilities: [ gpu ]
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    logging:
-      driver: gelf
-      options:
-        gelf-address: "udp://host.docker.internal:12201"  # Graylog порт из стека логирования
-        tag: "llama-cpp-inference"
     restart: unless-stopped
