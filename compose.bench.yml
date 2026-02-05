@@ -3,7 +3,7 @@ x-logging-gelf: &gelf-logging
     driver: gelf
     options:
       # Используем host.docker.internal вместо жесткого IP
-      gelf-address: "udp://172.17.0.1:12201" # Graylog порт из стека логирования
+      gelf-address: "udp://127.0.0.1:12201" # Graylog порт из стека логирования
       tag: "llm-bench-{{.Name}}" # автоматически добавит имя контейнера в тег
 
 services:
@@ -41,8 +41,6 @@ services:
       - ./corpus:/corpus
     ports:
       - "8080:8080"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     cap_add:
       - IPC_LOCK
     ulimits:
