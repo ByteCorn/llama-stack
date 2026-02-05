@@ -2,9 +2,9 @@ x-logging-gelf: &gelf-logging
   logging:
     driver: gelf
     options:
-      gelf-address: "udp://172.17.0.1:12201" # Graylog порт из стека логирования
-      tag: "llm-{{.Name}}" # автоматически добавит имя контейнера в тег
-
+      # Используем host.docker.internal вместо жесткого IP
+      gelf-address: "udp://host.docker.internal:12201" # Graylog порт из стека логирования
+      tag: "llm-bench-{{.Name}}" # автоматически добавит имя контейнера в тег
 
 services:
   llama_cpp:
@@ -38,6 +38,8 @@ services:
       - ./llama_cpp_cache:/build/cache
     ports:
       - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     cap_add:
       - IPC_LOCK
     ulimits:
