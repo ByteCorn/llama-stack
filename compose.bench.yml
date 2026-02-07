@@ -6,7 +6,7 @@ x-llm-base: &llm-base
     - ./cache:/cache
     - ./corpus:/corpus:ro
     - ./results:/results
-    - ./benchmark.sh:/benchmark.sh
+    - ./tests.sh:/tests.sh
   cap_add:
     - IPC_LOCK
     - SYS_NICE # для приоритизации процессов
@@ -43,7 +43,7 @@ services:
   llama_cpp_benchmark:
     <<: *llm-base
     container_name: llama_cpp_benchmark
-    entrypoint: [ "/bin/bash", "/benchmark.sh" ]
+    entrypoint: [ "/bin/bash", "/tests.sh" ]
     environment:
       # Конфигурация сервера
       - LLAMA_ARG_HOST=0.0.0.0 # сервер слушает на всех интерфейсах
@@ -59,8 +59,8 @@ services:
       # Контекст и память
       - LLAMA_ARG_CTX_SIZE=16384 # размер контекста
       - LLAMA_ARG_MMAP=true # используем маппинг файлов в память
-      # - LLAMA_ARG_MLOCK=true # форсимируем систему держать модель в RAM, чтобы избежать свопинга и сжатия
-      # - LLAMA_ARG_N_PREDICT=-1 # контролирует максимальное количество токенов для генерации. значение -1 означает «без ограничений»
+      - LLAMA_ARG_MLOCK=true # форсимируем систему держать модель в RAM, чтобы избежать свопинга и сжатия
+      - LLAMA_ARG_N_PREDICT=-1 # контролирует максимальное количество токенов для генерации. значение -1 означает «без ограничений»
       # Настройки батчинга
       # - LLAMA_ARG_BATCH=512 # максимальный логический размер батча, оптимальный для 24GB VRAM(по умолчанию: 2048)
       # - LLAMA_ARG_UBATCH=256 # максимальный физический размер батча, микропакеты для стабильности(по умолчанию: 512)
