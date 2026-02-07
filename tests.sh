@@ -7,7 +7,7 @@ MODEL_DIR="/models"
 
 # Используем контекст из Docker Compose. Если не задан, ставим безопасные 8192.
 CTX="${LLAMA_ARG_CTX_SIZE:-8192}"
-
+NGL="${LLAMA_ARG_N_GPU_LAYERS:-auto}"
 # Список моделей
 MODELS=(
   "qwen2.5-coder-32b-instruct-q5_k_m.gguf"
@@ -36,7 +36,7 @@ for model in "${MODELS[@]}"; do
   echo "🟡 МОДЕЛЬ: $model"
 
   echo "[1/2] Замер производительности..."
-  $BENCH_BIN -m "$MODEL_DIR/$model" -p $CTX -n 128 -ngl $LLAMA_ARG_N_GPU_LAYERS
+  $BENCH_BIN -m "$MODEL_DIR/$model" -p $CTX -n 128 -ngl $NGL
   
   echo ""
   echo "[2/2] Замер Perplexity (PPL)..."
@@ -47,7 +47,7 @@ for model in "${MODELS[@]}"; do
       start_time=$(date +%s)
       
       # Запуск замера качества
-      $PPL_BIN -m "$MODEL_DIR/$model" -f "$corpus_file" -c $CTX -ngl $LLAMA_ARG_N_GPU_LAYERS -fa auto
+      $PPL_BIN -m "$MODEL_DIR/$model" -f "$corpus_file" -c $CTX -ngl $NGL -fa auto
       
       end_time=$(date +%s)
       elapsed=$((end_time - start_time))
