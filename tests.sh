@@ -4,17 +4,17 @@
 BENCH_BIN="/app/llama-bench"
 PPL_BIN="/app/llama-perplexity"
 MODEL_DIR="/models"
+RESULTS_DIR="/results"
+
+# Создаем директорию для результатов и даем права на запись
+mkdir -p "${RESULTS_DIR}"
+chmod 777 "${RESULTS_DIR}" 2>/dev/null || true
 
 # Используем контекст из Docker Compose. Если не задан, ставим безопасные 8192.
 CTX="${LLAMA_ARG_CTX_SIZE:-8192}"
 
 # Потоки из переменных окружения или дефолт
 THREADS="${LLAMA_ARG_THREADS:-10}"
-
-# Директория для результатов
-RESULTS_DIR="/results"
-mkdir -p "${RESULTS_DIR}"
-chmod 777 "${RESULTS_DIR}" 2>/dev/null || true
 
 # Список моделей
 MODELS=(
@@ -36,14 +36,12 @@ echo "================================================================"
 echo ""
 
 echo "=== DEBUG START ================================================"
-echo ""
 $BENCH_BIN --help
 $PPL_BIN --help
 echo "=== DEBUG END =================================================="
 echo ""
 
 # Вывод диагностической информации
-echo ""
 echo "=== ДИАГНОСТИКА ==="
 echo "Хост: $(hostname)"
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
@@ -54,8 +52,10 @@ echo ""
 
 for model in "${MODELS[@]}"; do
 
+  model_path="${MODEL_DIR}/${model}"
+  # Проверяем, существует ли файл модели
   if [[ ! -f "$model_path" ]]; then
-    echo "⚠️ Файл модели не найден: $model"
+    echo "⚠️  Файл модели не найден: $model. Пропускаем."
     continue
   fi
 
