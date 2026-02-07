@@ -12,6 +12,7 @@ chmod 777 "${RESULTS_DIR}" 2>/dev/null || true
 
 # Используем контекст из Docker Compose. Если не задан, ставим безопасные 8192.
 CTX="${LLAMA_ARG_CTX_SIZE:-8192}"
+DEFAULT_NGL="${LLAMA_ARG_N_GPU_LAYERS:-auto}"
 
 # Потоки из переменных окружения или дефолт
 THREADS="${LLAMA_ARG_THREADS:-10}"
@@ -35,18 +36,29 @@ echo "⚙️ Контекст: $CTX | Потоков: $THREADS"
 echo "================================================================"
 echo ""
 
-echo "=== DEBUG START ================================================"
-$BENCH_BIN --help
-$PPL_BIN --help
-echo "=== DEBUG END =================================================="
-echo ""
+# echo "=== DEBUG START ================================================"
+# $BENCH_BIN --help
+# $PPL_BIN --help
+# echo "=== DEBUG END =================================================="
+# echo ""
 
 # Вывод диагностической информации
-echo "=== ДИАГНОСТИКА ==="
-echo "Хост: $(hostname)"
-echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
-echo "Свободно VRAM: $(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits) MB"
-echo "==================="
+echo "=== ДИАГНОСТИКА ПАМЯТИ ==="
+nvidia-smi --query-gpu=name,memory.total,memory.free,memory.used --format=csv
+echo "========================"
+echo ""
+
+echo "=== ПРОВЕРКА МОДЕЛЕЙ ==="
+for model in "${MODELS[@]}"; do
+  model_path="${MODEL_DIR}/${model}"
+  if [[ -f "$model_path" ]]; then
+    file_size=$(du -h "$model_path" | cut -f1)
+    echo "✅ $model - $file_size"
+  else
+    echo "❌ $model - НЕ НАЙДЕН"
+  fi
+done
+echo "======================="
 echo ""
 
 
@@ -62,25 +74,33 @@ for model in "${MODELS[@]}"; do
   echo ""
   echo "🟡 МОДЕЛЬ: $model"
 
-  # --- Динамический расчет NGL под 24GB VRAM ---
+  # Безопасные настройки для 24GB VRAM
   model_lower=$(echo "$model" | tr '[:upper:]' '[:lower:]')
   
   if [[ $model_lower == *"32b"* ]]; then
-    CURRENT_NGL=75
+    # 32B модели
     echo "⚡ 32B детектирована. Ставим NGL=$CURRENT_NGL (баланс памяти под контекст)."
-    GEN_TOKENS=256  # Для 32B можно генерировать больше токенов
-  
-  elif [[ $model_lower == *"70b"* ]]; then
-    if [[ $model_lower == *"q3_k_l"* ]]; then
+
+    if [[ $CTX -gt 8192 ]]; then
       CURRENT_NGL=40
+      GEN_TOKENS=64
     else
-      CURRENT_NGL=45
+      CURRENT_NGL=55
+      GEN_TOKENS=128
+    fi
+
+  elif [[ $model_lower == *"70b"* ]]; then
+    # 70B модели
+    if [[ $model_lower == *"q3_k_l"* ]]; then
+      CURRENT_NGL=30
+    else
+      CURRENT_NGL=35
     fi
     echo "📦 70B детектирована. Ставим NGL=$CURRENT_NGL (CPU+GPU гибрид)."
     GEN_TOKENS=128  # Для 70B меньше токенов для быстрого теста
   else
-    CURRENT_NGL=33
-    GEN_TOKENS=256
+    CURRENT_NGL=20
+    GEN_TOKENS=64
     echo "❓ Неизвестный размер. Ставим безопасный NGL=$CURRENT_NGL."
   fi
 
@@ -118,7 +138,7 @@ for model in "${MODELS[@]}"; do
         -m "$model_path" \
         -f "$corpus_file" \
         -c $CTX \
-        -ngl $CURRENT_NGL \
+        -ngl $DEFAULT_NGL \
         -t $THREADS \
         -fa 2>&1 | tee "$log_file" || {
           echo "⚠️ Perplexity тест завершился с ошибкой или таймаутом"
