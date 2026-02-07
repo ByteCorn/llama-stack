@@ -1,164 +1,160 @@
 #!/usr/bin/env bash
 # =================================================================
-# СКРИПТ ДЛЯ ТЕСТИРОВАНИЯ LLM МОДЕЛЕЙ С АДАПТАЦИЕЙ ПОД РЕСУРСЫ
+# СКРИПТ ТЕСТИРОВАНИЯ LLM МОДЕЛЕЙ (СТАБИЛЬНАЯ ВЕРСИЯ)
 # =================================================================
 
-set -eo pipefail
+set -e  # Выход при первой ошибке
 export LC_ALL=C.UTF-8
 
 # ==================== КОНФИГУРАЦИЯ ==============================
-readonly BIN_DIR="/app"
-readonly MODEL_DIR="/models"
-readonly CORPUS_DIR="/corpus"
-readonly RESULTS_DIR="/results"
-readonly CACHE_DIR="/cache"
-
-mkdir -p "${RESULTS_DIR}" "${CACHE_DIR}"
+BIN_DIR="/app"
+MODEL_DIR="/models"
+CORPUS_DIR="/corpus"
+RESULTS_DIR="/results"
+mkdir -p "${RESULTS_DIR}"
 
 # ==================== ДИАГНОСТИКА СИСТЕМЫ =======================
 echo "🖥  ДИАГНОСТИКА СИСТЕМЫ"
 echo "Хост: $(hostname)"
-echo "CPU: $(lscpu | grep 'Model name' | cut -d: -f2 | xargs)"
-echo "Память: $(free -h | awk '/^Mem:/ {print $2}')"
-GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader)
-GPU_MEMORY_MB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits)
-echo "GPU: ${GPU_NAME} (${GPU_MEMORY_MB} MB)"
-echo "Модели: $(find "${MODEL_DIR}" -name '*.gguf' | wc -l) файлов"
+echo "CPU: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs)"
+echo "Память: $(grep 'MemTotal' /proc/meminfo | awk '{print $2/1024/1024 " GB"}')"
+nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
 
-# ==================== АДАПТИВНЫЕ ПАРАМЕТРЫ ======================
-HOST_THREADS=$(nproc)
-OPTIMAL_THREADS=$((HOST_THREADS - 2))
-echo "Используем потоков CPU: ${OPTIMAL_THREADS}"
+# ==================== ФИКСИРОВАННЫЕ ПАРАМЕТРЫ ===================
+# РУЧНАЯ НАСТРОЙКА ПОД ТВОЮ СИСТЕМУ (МЕНЯЙ ЗДЕСЬ)
+CTX=16384
+BATCH=512
+THREADS=10
 
-GPU_FREE_MB=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits)
-echo "Свободно памяти GPU: ${GPU_FREE_MB} MB"
-
-if [[ ${GPU_FREE_MB} -gt 30000 ]]; then
-    CTX=32768
-    NGL="auto"
-elif [[ ${GPU_FREE_MB} -gt 20000 ]]; then
-    CTX=16384
-    NGL="auto"
-else
-    CTX=8192
-    NGL="auto"
-fi
-
-# Безопасная адаптация NGL для больших моделей (70B) по имени файла
-model_name_lower=$(echo "${model}" | tr '[:upper:]' '[:lower:]')
-if [[ "${model_name_lower}" == *"70b"* ]]; then
-    echo "⚠️  Обнаружена 70B модель. Ограничиваю NGL."
-    NGL=40  # Безопасное значение для 24 ГБ VRAM
-fi
-
-echo "Выбран размер контекста: ${CTX}"
-echo "Выбран режим загрузки слоёв на GPU: ${NGL}"
-
-# ==================== ФУНКЦИИ ТЕСТИРОВАНИЯ ======================
-check_model() {
+# Эвристика для NGL на основе имени модели
+get_ngl_for_model() {
     local model=$1
-    local model_path="${MODEL_DIR}/${model}"
+    local model_lower=$(echo "$model" | tr '[:upper:]' '[:lower:]')
     
-    if ! "${BIN_DIR}/llama-inspect" -m "${model_path}" > /dev/null 2>&1; then
-        echo "❌ Модель повреждена или несовместима: ${model}"
-        return 1
+    if [[ "$model_lower" == *"70b"* ]]; then
+        echo "45"  # Для 70B моделей на 24 ГБ VRAM
+    elif [[ "$model_lower" == *"32b"* ]] || [[ "$model_lower" == *"33b"* ]]; then
+        echo "75"  # Для 32B/33B моделей
+    else
+        echo "99"  # Для всех остальных (почти все слои на GPU)
     fi
-    return 0
 }
 
+# ==================== ФУНКЦИИ ТЕСТИРОВАНИЯ ======================
 run_benchmark() {
     local model=$1
-    local output="${RESULTS_DIR}/benchmark_${model}_$(date +%Y%m%d_%H%M%S).log"
+    local ngl=$2
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local log_file="${RESULTS_DIR}/bench_${model}_${timestamp}.log"
     
-    echo "🧪 ЗАПУСК БЕНЧМАРКА СКОРОСТИ ДЛЯ МОДЕЛИ: ${model}"
+    echo "🧪 ТЕСТ СКОРОСТИ: $model (NGL=$ngl)"
     
-    # Запускаем llama-bench. Используем tee для записи лога.
-    "${BIN_DIR}/llama-bench" \
+    # Запускаем llama-bench с безопасными параметрами
+    timeout 300 "${BIN_DIR}/llama-bench" \
         -m "${MODEL_DIR}/${model}" \
         -c ${CTX} \
         -n 256 \
-        -ngl ${NGL} \
-        -fa 2>&1 | tee "${output}"
+        -ngl ${ngl} \
+        -t ${THREADS} \
+        -fa \
+        --verbose 2>&1 | tee "$log_file" || {
+            echo "⚠️  Бенчмарк завершился с ошибкой или таймаутом"
+            return 1
+        }
     
-    # Простой анализ результата (извлекаем последнюю строку таблицы)
-    if tail -n 5 "${output}" | grep -q "t/s"; then
-        echo "📈 Бенчмарк завершён. Полные результаты в: ${output}"
+    # Простая проверка успешности
+    if tail -5 "$log_file" | grep -q "t/s"; then
+        echo "✅ Бенчмарк завершён"
     else
-        echo "⚠️  Возможная ошибка выполнения бенчмарка. Проверь лог: ${output}"
+        echo "❌ Возможная ошибка в бенчмарке"
+        return 1
     fi
 }
 
 run_perplexity() {
     local model=$1
-    local corpus=$2
-    local output="${RESULTS_DIR}/perplexity_${model}_$(basename "${corpus}")_$(date +%Y%m%d_%H%M%S).log"
+    local ngl=$2
+    local corpus=$3
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local corpus_name=$(basename "$corpus" .txt)
+    local log_file="${RESULTS_DIR}/ppl_${model}_${corpus_name}_${timestamp}.log"
     
-    echo "📚 ИЗМЕРЕНИЕ PERPLEXITY НА ФАЙЛЕ: $(basename "${corpus}")"
+    echo "📚 PERPLEXITY: $model → $corpus_name"
     
-    # Используем --verbose для более детального вывода, tee записывает всё в лог.
-    "${BIN_DIR}/llama-perplexity" \
+    # Используем --chunks 0 для быстрого теста (полный расчёт)
+    timeout 600 "${BIN_DIR}/llama-perplexity" \
         -m "${MODEL_DIR}/${model}" \
-        -f "${corpus}" \
+        -f "$corpus" \
         -c ${CTX} \
-        -ngl ${NGL} \
+        -ngl ${ngl} \
+        -t ${THREADS} \
         -fa \
-        --verbose 2>&1 | tee "${output}"
+        --chunks 0 \
+        --verbose 2>&1 | tee "$log_file" || {
+            echo "⚠️  Perplexity тест завершился с ошибкой или таймаутом"
+            return 1
+        }
     
-    # Универсальный способ извлечь итоговый PPL
-    local final_ppl=$(grep -o "PPL = [0-9.]*" "${output}" | tail -1 | awk '{print $3}')
-    if [[ -n "${final_ppl}" ]]; then
-        echo "🎯 Итоговый PPL: ${final_ppl} (полный лог: ${output})"
+    # Извлекаем результат
+    if grep -q "Final estimate:" "$log_file"; then
+        local ppl=$(grep "Final estimate:" "$log_file" | tail -1 | grep -o "PPL = [0-9.]*" | cut -d' ' -f3)
+        echo "🎯 PPL: ${ppl:-не найден}"
     else
-        echo "⚠️  Не удалось извлечь значение perplexity. Смотри лог: ${output}"
+        echo "⚠️  Не удалось получить PPL"
     fi
 }
 
 # ==================== ОСНОВНОЙ ЦИКЛ =============================
 main() {
-    declare -a MODELS=(
-        "qwen2.5-coder-32b-instruct-q5_k_m.gguf"
-        "Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M.gguf"
-        "Llama-3.3-70B-Instruct-abliterated-Q3_K_M.gguf"
-    )
+    # СПИСОК МОДЕЛЕЙ (оставь только те, которые есть в папке /models)
+    local models=()
     
-    # Важно: имя массива CORPUS, а не CORPORA!
-    declare -a CORPUS=(
-        "${CORPUS_DIR}/lean_corpus.txt"
-        "${CORPUS_DIR}/python_corpus.txt"
-    )
-    
-    for model in "${MODELS[@]}"; do
-        if [[ ! -f "${MODEL_DIR}/${model}" ]]; then
-            echo "⚠️ Файл модели не найден: ${model}. Пропускаю."
-            continue
+    # Автоматически находим все .gguf файлы
+    for model_file in "$MODEL_DIR"/*.gguf; do
+        if [[ -f "$model_file" ]]; then
+            models+=("$(basename "$model_file")")
         fi
-
+    done
+    
+    if [[ ${#models[@]} -eq 0 ]]; then
+        echo "❌ Нет моделей в $MODEL_DIR"
+        exit 1
+    fi
+    
+    echo "📋 Найдено моделей: ${#models[@]}"
+    
+    # Корпусы для тестирования
+    local corpora=("${CORPUS_DIR}/lean_corpus.txt" "${CORPUS_DIR}/python_corpus.txt")
+    
+    for model in "${models[@]}"; do
         echo ""
-        echo "🚀 НАЧИНАЮ ТЕСТИРОВАНИЕ МОДЕЛИ: ${model}"
+        echo "🚀 МОДЕЛЬ: $model"
         echo "========================================"
         
-        if ! check_model "${model}"; then
+        # Определяем NGL для этой модели
+        local ngl=$(get_ngl_for_model "$model")
+        echo "⚙️  Параметры: CTX=${CTX}, NGL=${ngl}, THREADS=${THREADS}"
+        
+        # Тест скорости
+        if ! run_benchmark "$model" "$ngl"; then
+            echo "⏭️  Пропускаю остальные тесты для этой модели"
             continue
         fi
         
-        run_benchmark "${model}"
-        
-        # Критичное исправление: используем правильное имя массива CORPUS
-        for corpus in "${CORPUS[@]}"; do
-            if [[ -f "${corpus}" ]]; then
-                run_perplexity "${model}" "${corpus}"
-            else
-                echo "⚠️ Файл корпуса не найден: ${corpus}"
+        # Тесты perplexity для каждого корпуса
+        for corpus in "${corpora[@]}"; do
+            if [[ -f "$corpus" ]]; then
+                run_perplexity "$model" "$ngl" "$corpus"
             fi
         done
         
-        echo "❄️ Пауза для охлаждения GPU (30 сек)..."
+        echo "❄️  Пауза 30 сек..."
         sleep 30
     done
     
     echo ""
     echo "🎉 ТЕСТИРОВАНИЕ ЗАВЕРШЕНО"
-    echo "📊 Результаты и полные логи в: ${RESULTS_DIR}"
+    echo "📁 Логи в: $RESULTS_DIR"
 }
 
 # ==================== ЗАПУСК ====================================
