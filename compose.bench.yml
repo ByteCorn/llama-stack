@@ -9,7 +9,7 @@ x-llm-base: &llm-base
     - ./benchmark.sh:/benchmark.sh
   cap_add:
     - IPC_LOCK
-    - SYS_NICE 0 # для приоритизации процессов
+    - SYS_NICE # для приоритизации процессов
   ulimits:
     memlock:
       soft: -1

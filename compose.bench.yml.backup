@@ -67,7 +67,6 @@ services:
       # Дополнительные оптимизации
       - LLAMA_ARG_FLASH_ATTN=auto # используем Flash Attention, если поддерживается
       - LLAMA_ARG_KV_UNIFIED=true # единый буфер кэша KV для всех последовательностей
-    entrypoint: ["/bin/bash", "/run_tests.sh"]
     volumes:
       - ./models:/models:ro
       - ./corpus:/corpus:ro
