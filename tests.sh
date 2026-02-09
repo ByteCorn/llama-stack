@@ -13,7 +13,7 @@ chmod 777 "${RESULTS_DIR}" 2>/dev/null || true
 # Используем контекст из Docker Compose. Если не задан, ставим безопасные 8192.
 CTX="${LLAMA_ARG_CTX_SIZE:-8192}"
 DEFAULT_NGL="${LLAMA_ARG_N_GPU_LAYERS:-auto}"
-GEN_TOKENS="${LLAMA_ARG_N_PREDICT:--1}"
+# GEN_TOKENS="${LLAMA_ARG_N_PREDICT:--1}"
 
 
 # Потоки из переменных окружения или дефолт
@@ -115,7 +115,6 @@ for model in "${MODELS[@]}"; do
   $BENCH_BIN \
     -m "$model_path" \
     -p $CTX \
-    -n $GEN_TOKENS \
     -ngl $DEFAULT_NGL \
     -t $THREADS \
     -fa auto \
