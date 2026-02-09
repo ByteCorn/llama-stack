@@ -13,7 +13,6 @@ chmod 777 "${RESULTS_DIR}" 2>/dev/null || true
 # Используем контекст из Docker Compose. Если не задан, ставим безопасные 8192.
 CTX="${LLAMA_ARG_CTX_SIZE:-8192}"
 NGL="${LLAMA_ARG_N_GPU_LAYERS:-auto}"
-# GEN_TOKENS="${LLAMA_ARG_N_PREDICT:--1}"
 
 # Потоки из переменных окружения или дефолт
 THREADS="${LLAMA_ARG_THREADS:-10}"
@@ -55,12 +54,13 @@ for model in "${MODELS[@]}"; do
     echo "❌ $model - НЕ НАЙДЕН"
   fi
 
-  # --- Расчет NGL под 24GB VRAM ---
-  # 32B модели весят ~22GB. Чтобы оставить место под KV-кеш $CTX, ставим NGL 61.
+  # Установка NGL под 24GB VRAM
   if [[ $model == *"qwen2.5-coder-32b-instruct-q5_k_m"* ]]; then 
     N_GPU_LAYERS=61
     echo "⚡ детектирована qwen2.5-coder-32b-instruct-q5_k_m | ставим NGL=$N_GPU_LAYERS"
-  # 70B модели весят 32-35GB. Все не влезут. Максимум для 3090 Ti — около 45 слоев.
+  elif [[ $model == *"Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M"* ]]; then
+    N_GPU_LAYERS=61
+    echo "⚡ детектирована Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M | ставим NGL=$N_GPU_LAYERS"
   elif [[ $model == *"70b"* || $model == *"70B"* ]]; then
      # Для более тяжелой версии (Q3_K_L) чуть меньше слоев
     if [[ $model == *"Q3_K_L"* ]]; then
@@ -88,7 +88,7 @@ for model in "${MODELS[@]}"; do
     --verbose 2>&1 || {
       echo "⚠️ Бенчмарк завершился с ошибкой или таймаутом"
       echo ""
-      # Продолжаем тесты, несмотря на ошибку бенчмарка
+      # Продолжаем тесты, несмотря на ошибку
     }
 
   # Пауза между тестами
@@ -113,7 +113,7 @@ for model in "${MODELS[@]}"; do
         -t $THREADS \
         -fa auto 2>&1 || {
           echo "⚠️ Perplexity тест завершился с ошибкой"
-        # Продолжаем тесты, несмотря на ошибку бенчмарка
+        # Продолжаем тесты, несмотря на ошибку
         }
 
       end_time=$(date +%s)
