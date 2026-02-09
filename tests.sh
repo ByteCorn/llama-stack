@@ -15,7 +15,6 @@ CTX="${LLAMA_ARG_CTX_SIZE:-8192}"
 DEFAULT_NGL="${LLAMA_ARG_N_GPU_LAYERS:-auto}"
 # GEN_TOKENS="${LLAMA_ARG_N_PREDICT:--1}"
 
-
 # Потоки из переменных окружения или дефолт
 THREADS="${LLAMA_ARG_THREADS:-10}"
 
@@ -63,81 +62,49 @@ done
 echo "======================="
 echo ""
 
-
 for model in "${MODELS[@]}"; do
 
   model_path="${MODEL_DIR}/${model}"
   # Проверяем, существует ли файл модели
   if [[ ! -f "$model_path" ]]; then
     echo "⚠️  Файл модели не найден: $model. Пропускаем."
+    echo ""
     continue
   fi
 
-  echo ""
+  
   echo "🟡 МОДЕЛЬ: $model"
-    
+  echo ""
+
   echo "[1/2] Замер производительности с параметрами:"
-  echo "      NGL=$DEFAULT_NGL, GEN_TOKENS=$GEN_TOKENS, CTX=$CTX, THREADS=$THREADS"
+  echo "      NGL=99, CTX=$CTX, THREADS=$THREADS"
+  echo ""
 
-  # # Безопасные настройки для 24GB VRAM
-  # model_lower=$(echo "$model" | tr '[:upper:]' '[:lower:]')
-  
-  # if [[ $model_lower == *"32b"* ]]; then
-  #   # 32B модели
-  #   echo "⚡ 32B детектирована. Ставим NGL=$CURRENT_NGL (баланс памяти под контекст)."
-
-  #   if [[ $CTX -gt 8192 ]]; then
-  #     CURRENT_NGL=40
-  #     GEN_TOKENS=64
-  #   else
-  #     CURRENT_NGL=55
-  #     GEN_TOKENS=128
-  #   fi
-
-  # elif [[ $model_lower == *"70b"* ]]; then
-  #   # 70B модели
-  #   if [[ $model_lower == *"q3_k_l"* ]]; then
-  #     CURRENT_NGL=30
-  #   else
-  #     CURRENT_NGL=35
-  #   fi
-  #   echo "📦 70B детектирована. Ставим NGL=$CURRENT_NGL (CPU+GPU гибрид)."
-  #   GEN_TOKENS=128  # Для 70B меньше токенов для быстрого теста
-  # else
-  #   CURRENT_NGL=20
-  #   GEN_TOKENS=64
-  #   echo "❓ Неизвестный размер. Ставим безопасный NGL=$CURRENT_NGL."
-  # fi
-
-  # echo "[1/2] Замер производительности..."
-  
-  # Используем timeout для защиты от зависаний
   $BENCH_BIN \
     -m "$model_path" \
     -p $CTX \
-    -ngl $DEFAULT_NGL \
     -t $THREADS \
     -fa auto \
     --verbose 2>&1 || {
       echo "⚠️ Бенчмарк завершился с ошибкой или таймаутом"
+      echo ""
       # Продолжаем тесты, несмотря на ошибку бенчмарка
     }
-  
+
   # Пауза между тестами
   echo "⏸️  Пауза 10 сек..."
   sleep 10
-  
+
   echo ""
   echo "[2/2] Замер Perplexity (PPL)..."
-  
+  echo "      NGL=$DEFAULT_NGL, CTX=$CTX, THREADS=$THREADS"
+  echo ""
+
   for corpus_file in "${CORPUS_FILES[@]}"; do
     if [[ -f "$corpus_file" ]]; then
       echo "--> Файл: $(basename "$corpus_file")"
       start_time=$(date +%s)
-      
-      # # Запуск замера качества с логированием
-      # log_file="${RESULTS_DIR}/ppl_${model}_$(basename "$corpus_file")_$(date +%Y%m%d_%H%M%S).log"
-      
+  
       $PPL_BIN \
         -m "$model_path" \
         -f "$corpus_file" \
@@ -146,21 +113,17 @@ for model in "${MODELS[@]}"; do
         -t $THREADS \
         -fa auto 2>&1 || {
           echo "⚠️ Perplexity тест завершился с ошибкой"
+        # Продолжаем тесты, несмотря на ошибку бенчмарка
         }
-      
+
       end_time=$(date +%s)
       elapsed=$((end_time - start_time))
       echo "⏱ Время теста: $((elapsed/60)) мин. $((elapsed%60)) сек."
-      
-      # # Извлекаем результат из лога
-      # if [[ -f "$log_file" ]] && grep -q "Final estimate:" "$log_file"; then
-      #   ppl_result=$(grep "Final estimate:" "$log_file" | tail -1 | grep -o "PPL = [0-9.]*" | cut -d' ' -f3)
-      #   echo "🎯 Результат PPL: ${ppl_result}"
-      # fi
+
     else
       echo "⚠️ Файл $corpus_file не найден!"
     fi
-    
+
     # Пауза между корпусами
     echo "⏸️  Пауза 60 сек..."
     sleep 60
@@ -168,7 +131,7 @@ for model in "${MODELS[@]}"; do
 
   echo "----------------------------------------------------------------"
   echo "✅ Завершено: $model"
-  
+
   # Пауза между моделями для охлаждения GPU
   echo "❄️ Охлаждение GPU (10 минут)..."
   sleep 600
