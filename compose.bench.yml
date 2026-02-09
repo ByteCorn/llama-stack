@@ -45,13 +45,6 @@ services:
     container_name: llama_cpp_benchmark
     entrypoint: [ "/bin/bash", "/tests.sh" ]
     environment:
-      # Конфигурация сервера
-      - LLAMA_ARG_HOST=0.0.0.0 # сервер слушает на всех интерфейсах
-      - LLAMA_ARG_PORT=8080 # порт для подключения
-      - LLAMA_ARG_THREADS_HTTP=4 # количество потоков для обработки HTTP-запросов
-      # Конфигурация модели
-      - LLAMA_ARG_MODEL=/models/Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M.gguf # путь к модели
-      - LLAMA_ARG_ALIAS=qwencoder # псевдоним модели
       # Параллелизм и потоки
       - LLAMA_ARG_THREADS=10 # потоков для вычислений
       - LLAMA_ARG_THREADS_BATCH=10 # потоков для пакетной обработки
@@ -79,9 +72,7 @@ services:
       # Прецизионные настройки
       - LLAMA_ARG_CACHE_TYPE_K=f16 # ключи в float16
       - LLAMA_ARG_CACHE_TYPE_V=f16 # значения в float16
-      - LLAMA_ARG_ROPE_SCALING_TYPE=yarn # YARN для длинного контекста
-      # - LLAMA_ARG_ROPE_FREQ_BASE=1000000 # база частоты ротации
-      # Стратегия кеширования (адаптивная на основе свободной памяти)
+      # Стратегия кеширования
       - LLAMA_ARG_SPLIT_MODE=none # разделить модель между несколькими графическими процессорами
       # Оптимизации производительности
       - GGML_CUDA_MMQ_Y=1 # включаем оптимизированные матричные умножения
