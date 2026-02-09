@@ -428,7 +428,7 @@ for model in "${MODELS[@]}"; do
         -c $CTX \
         -ngl $DEFAULT_NGL \
         -t $THREADS \
-        -fa 2>&1 | tee "$log_file" || {
+        -fa auto 2>&1 | tee "$log_file" || {
           echo "⚠️ Perplexity тест завершился с ошибкой"
         }
       
