@@ -395,7 +395,7 @@ for model in "${MODELS[@]}"; do
   # echo "[1/2] Замер производительности..."
   
   # Используем timeout для защиты от зависаний
-  timeout 3600 $BENCH_BIN \
+  $BENCH_BIN \
     -m "$model_path" \
     -p $CTX \
     -n $GEN_TOKENS \
