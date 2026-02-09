@@ -75,7 +75,7 @@ for model in "${MODELS[@]}"; do
      echo "❓ Неизвестный размер. Ставим безопасный NGL=$N_GPU_LAYERS"
   fi
 
-  echo "[1/2] Замер производительности с параметрами:"
+  echo "[1/2] Прогрев модели с параметрами:"
   echo "      NGL=$N_GPU_LAYERS, CTX=$CTX, THREADS=$THREADS"
   echo ""
 
