@@ -12,7 +12,7 @@ chmod 777 "${RESULTS_DIR}" 2>/dev/null || true
 
 # Используем контекст из Docker Compose. Если не задан, ставим безопасные 8192.
 CTX="${LLAMA_ARG_CTX_SIZE:-8192}"
-DEFAULT_NGL="${LLAMA_ARG_N_GPU_LAYERS:-auto}"
+NGL="${LLAMA_ARG_N_GPU_LAYERS:-auto}"
 # GEN_TOKENS="${LLAMA_ARG_N_PREDICT:--1}"
 
 # Потоки из переменных окружения или дефолт
@@ -33,15 +33,9 @@ CORPUS_FILES=(
 
 echo "================================================================"
 echo "🦾 ЗАПУСК ОПТИМИЗИРОВАННОГО ТЕСТИРОВАНИЯ (3090 Ti Edition)"
-echo "⚙️ Контекст: $CTX | Потоков: $THREADS"
+echo "⚙️ Контекст: $CTX | Загрузка слоёв в видеокарту: $NGL | Потоков: $THREADS"
 echo "================================================================"
 echo ""
-
-# echo "=== DEBUG START ================================================"
-# $BENCH_BIN --help
-# $PPL_BIN --help
-# echo "=== DEBUG END =================================================="
-# echo ""
 
 # Вывод диагностической информации
 echo "=== ДИАГНОСТИКА ПАМЯТИ ==="
@@ -49,41 +43,47 @@ nvidia-smi --query-gpu=name,memory.total,memory.free,memory.used --format=csv
 echo "========================"
 echo ""
 
-echo "=== ПРОВЕРКА МОДЕЛЕЙ ==="
 for model in "${MODELS[@]}"; do
+
   model_path="${MODEL_DIR}/${model}"
+
+  # Проверяем, существует ли файл модели
   if [[ -f "$model_path" ]]; then
     file_size=$(du -h "$model_path" | cut -f1)
-    echo "✅ $model - $file_size"
+    echo "✅ МОДЕЛЬ: $model - $file_size"
   else
     echo "❌ $model - НЕ НАЙДЕН"
   fi
-done
-echo "======================="
-echo ""
 
-for model in "${MODELS[@]}"; do
-
-  model_path="${MODEL_DIR}/${model}"
-  # Проверяем, существует ли файл модели
-  if [[ ! -f "$model_path" ]]; then
-    echo "⚠️  Файл модели не найден: $model. Пропускаем."
-    echo ""
-    continue
+  # --- Расчет NGL под 24GB VRAM ---
+  # 32B модели весят ~22GB. Чтобы оставить место под KV-кеш $CTX, ставим NGL 60.
+  if [[ $model == *"32b"* || $model == *"32B"* ]]; then 
+    N_GPU_LAYERS=60
+    echo "⚡ 32B детектирована. Ставим NGL=$N_GPU_LAYERS"
+  # 70B модели весят 32-35GB. Все не влезут. Максимум для 3090 Ti — около 45 слоев.
+  elif [[ $model == *"70b"* || $model == *"70B"* ]]; then
+     # Для более тяжелой версии (Q3_K_L) чуть меньше слоев
+    if [[ $model == *"Q3_K_L"* ]]; then
+      N_GPU_LAYERS=40
+      echo "📦 70B детектирована(Q3_K_L). NGL=$N_GPU_LAYERS"
+    else
+      N_GPU_LAYERS=45
+      echo "📦 70B детектирована. NGL=$N_GPU_LAYERS"
+    fi 
+  else
+     N_GPU_LAYERS=33
+     echo "❓ Неизвестный размер. Ставим безопасный NGL=$N_GPU_LAYERS"
   fi
 
-  
-  echo "🟡 МОДЕЛЬ: $model"
-  echo ""
-
   echo "[1/2] Замер производительности с параметрами:"
-  echo "      NGL=99, CTX=$CTX, THREADS=$THREADS"
+  echo "      NGL=$N_GPU_LAYERS, CTX=$CTX, THREADS=$THREADS"
   echo ""
 
   $BENCH_BIN \
     -m "$model_path" \
     -p $CTX \
     -t $THREADS \
+    -ngl $N_GPU_LAYERS \
     -fa auto \
     --verbose 2>&1 || {
       echo "⚠️ Бенчмарк завершился с ошибкой или таймаутом"
@@ -97,7 +97,7 @@ for model in "${MODELS[@]}"; do
 
   echo ""
   echo "[2/2] Замер Perplexity (PPL)..."
-  echo "      NGL=$DEFAULT_NGL, CTX=$CTX, THREADS=$THREADS"
+  echo "      NGL=$NGL, CTX=$CTX, THREADS=$THREADS"
   echo ""
 
   for corpus_file in "${CORPUS_FILES[@]}"; do
@@ -109,7 +109,7 @@ for model in "${MODELS[@]}"; do
         -m "$model_path" \
         -f "$corpus_file" \
         -c $CTX \
-        -ngl $DEFAULT_NGL \
+        -ngl $NGL \
         -t $THREADS \
         -fa auto 2>&1 || {
           echo "⚠️ Perplexity тест завершился с ошибкой"
