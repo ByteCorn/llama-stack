@@ -57,9 +57,9 @@ for model in "${MODELS[@]}"; do
 
   # --- Расчет NGL под 24GB VRAM ---
   # 32B модели весят ~22GB. Чтобы оставить место под KV-кеш $CTX, ставим NGL 60.
-  if [[ $model == *"32b"* || $model == *"32B"* ]]; then 
-    N_GPU_LAYERS=60
-    echo "⚡ 32B детектирована. Ставим NGL=$N_GPU_LAYERS"
+  if [[ $model == *"qwen2.5-coder-32b-instruct-q5_k_m"* ]]; then 
+    N_GPU_LAYERS=64
+    echo "⚡ детектирована qwen2.5-coder-32b-instruct-q5_k_m | ставим NGL=$N_GPU_LAYERS"
   # 70B модели весят 32-35GB. Все не влезут. Максимум для 3090 Ti — около 45 слоев.
   elif [[ $model == *"70b"* || $model == *"70B"* ]]; then
      # Для более тяжелой версии (Q3_K_L) чуть меньше слоев

@@ -68,7 +68,7 @@ services:
       - LLAMA_ARG_N_GPU_LAYERS=auto # автоопределение загрузки слоёв модели на GPU
       - LLAMA_ARG_MAIN_GPU=0 # явно указываем GPU
       - LLAMA_ARG_TENSOR_SPLIT=0 # все тензоры на одну карту
-      # - LLAMA_ARG_KV_OFFLOAD=true # включаем offload KV для лучшего использования GPU
+      - LLAMA_ARG_KV_OFFLOAD=true # включаем offload KV для лучшего использования GPU
       # Дополнительные оптимизации
       - LLAMA_ARG_FLASH_ATTN=auto # используем Flash Attention, если поддерживается
       - LLAMA_ARG_KV_UNIFIED=true # единый буфер кэша KV для всех последовательностей
@@ -77,8 +77,8 @@ services:
       - LLAMA_ARG_PERF=true # включить вывод внутренних метрик производительности
       - LLAMA_ARG_REPACK=true # включить перепаковку весов модели при загрузке
       # Прецизионные настройки
-      # - LLAMA_ARG_CACHE_TYPE_K=f16 # ключи в float16
-      # - LLAMA_ARG_CACHE_TYPE_V=f16 # значения в float16
+      - LLAMA_ARG_CACHE_TYPE_K=f16 # ключи в float16
+      - LLAMA_ARG_CACHE_TYPE_V=f16 # значения в float16
       - LLAMA_ARG_ROPE_SCALING_TYPE=yarn # YARN для длинного контекста
       # - LLAMA_ARG_ROPE_FREQ_BASE=1000000 # база частоты ротации
       # Стратегия кеширования (адаптивная на основе свободной памяти)
