@@ -66,8 +66,8 @@ services:
       - LLAMA_ARG_UBATCH=256 # максимальный физический размер батча, микропакеты для стабильности(по умолчанию: 512)
       # GPU настройки
       - LLAMA_ARG_N_GPU_LAYERS=auto # автоопределение загрузки слоёв модели на GPU
-      # - LLAMA_ARG_MAIN_GPU=0 # явно указываем GPU
-      # - LLAMA_ARG_TENSOR_SPLIT=0 # все тензоры на одну карту
+      - LLAMA_ARG_MAIN_GPU=0 # явно указываем GPU
+      - LLAMA_ARG_TENSOR_SPLIT=0 # все тензоры на одну карту
       # - LLAMA_ARG_KV_OFFLOAD=false # включаем offload KV для лучшего использования GPU
       # Дополнительные оптимизации
       - LLAMA_ARG_FLASH_ATTN=auto # используем Flash Attention, если поддерживается
