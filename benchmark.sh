@@ -38,11 +38,11 @@ get_ngl_for_model() {
     elif [[ $model == *"Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M"* ]]; then
         echo "61" # из 64 слоёв
     elif [[ $model == *"Llama_3.x_70b_L3.3-Dolphin-Eva_fusion_v2.Q3_K_L"* ]]; then
-        echo "40" # из 80 слоёв
+        echo "48" # из 80 слоёв
     elif [[ $model == *"Llama-3.3-70B-Instruct-abliterated-Q3_K_M"* ]]; then
-        echo "40" # ???
-    elif [[ $model == *"gpt-oss-20b-mxfp4.gguf"* ]]; then
-        echo "35" # ???
+        echo "53" # из 80 слоёв
+    elif [[ $model == *"gpt-oss-20b-mxfp4"* ]]; then
+        echo "23" # из 24 слоёв
     else
        echo "30"  # Для всех остальных
     fi
@@ -55,7 +55,7 @@ run_benchmark() {
     local timestamp=$(date +%Y%m%d_%H%M%S)
     local log_file="${RESULTS_DIR}/bench_${model}_${timestamp}.log"
 
-    echo "🧪 ТЕСТ СКОРОСТИ: $model (NGL=$ngl)"
+    echo "🧪 ТЕСТ СКОРОСТИ: $model (NGL=$ngl, CTX=$CTX, THREADS=$THREADS)"
 
     # Запускаем llama-bench с безопасными параметрами
     ${BIN_DIR}/llama-bench \
@@ -70,11 +70,12 @@ run_benchmark() {
             # Продолжаем тесты, несмотря на ошибку
         }
 
-    # Простая проверка успешности
+    # Проверка успешности
     if tail -5 "$log_file" | grep -q "t/s"; then
         echo "✅ Бенчмарк завершён"
+        return 0
     else
-        echo "❌ Возможная ошибка в бенчмарке"
+        echo "❌ Ошибка в бенчмарке"
         return 1
     fi
 }
@@ -87,7 +88,7 @@ run_perplexity() {
     local corpus_name=$(basename "$corpus" .txt)
     local log_file="${RESULTS_DIR}/ppl_${model}_${corpus_name}_${timestamp}.log"
 
-    echo "📚 PERPLEXITY: $model → $corpus_name"
+    echo "📚 PERPLEXITY: $model → $corpus_name (CTX=$ctx_ppl, NGL=$ngl)"
 
     # Используем --chunks 100 для быстрого теста (полный расчёт)
     ${BIN_DIR}/llama-perplexity \
@@ -124,44 +125,44 @@ main() {
             models+=("$(basename "$model_file")")
         fi
     done
-    
+
     if [[ ${#models[@]} -eq 0 ]]; then
         echo "❌ Нет моделей в $MODEL_DIR"
         exit 1
     fi
-    
+
     echo "📋 Найдено моделей: ${#models[@]}"
-    
+
     # Корпусы для тестирования
     local corpora=("${CORPUS_DIR}/lean_corpus.txt" "${CORPUS_DIR}/python_corpus.txt")
-    
+
     for model in "${models[@]}"; do
         echo ""
         echo "🚀 МОДЕЛЬ: $model"
         echo "========================================"
-        
+
         # Определяем NGL для этой модели
         local ngl=$(get_ngl_for_model "$model")
         echo "⚙️  Параметры: CTX=${CTX}, NGL=${ngl}, THREADS=${THREADS}"
-        
+
         # Тест скорости
         if ! run_benchmark "$model" "$ngl"; then
             # echo "⏭️  Пропускаю остальные тесты для этой модели"
             echo "⏭️ Продолжаю тесты для этой модели"
             # continue
         fi
-        
+
         # Тесты perplexity для каждого корпуса
         for corpus in "${corpora[@]}"; do
             if [[ -f "$corpus" ]]; then
-                run_perplexity "$model" "auto" "$corpus"
+                run_perplexity "$model" "$ngl" "$corpus"
             fi
         done
-        
+
         echo "❄️  Пауза 30 сек..."
         sleep 30
     done
-    
+
     echo ""
     echo "🎉 ТЕСТИРОВАНИЕ ЗАВЕРШЕНО"
     echo "📁 Логи в: $RESULTS_DIR"
