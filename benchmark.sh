@@ -89,7 +89,7 @@ run_perplexity() {
 
     echo "📚 PERPLEXITY: $model → $corpus_name"
 
-    # Используем --chunks 0 для быстрого теста (полный расчёт)
+    # Используем --chunks 100 для быстрого теста (полный расчёт)
     ${BIN_DIR}/llama-perplexity \
         -m "${MODEL_DIR}/${model}" \
         -f "$corpus" \
@@ -97,7 +97,7 @@ run_perplexity() {
         -ngl ${ngl} \
         -t ${THREADS} \
         -fa auto \
-        --chunks 0 \
+        --chunks 100 \
         --verbose 2>&1 | tee "$log_file" || {
             echo "⚠️  Perplexity тест завершился с ошибкой или таймаутом"
             echo ""
@@ -154,7 +154,7 @@ main() {
         # Тесты perplexity для каждого корпуса
         for corpus in "${corpora[@]}"; do
             if [[ -f "$corpus" ]]; then
-                run_perplexity "$model" "$ngl" "$corpus"
+                run_perplexity "$model" "auto" "$corpus"
             fi
         done
         
