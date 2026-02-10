@@ -18,3 +18,7 @@ hf download mradermacher/Llama_3.x_70b_L3.3-Dolphin-Eva_fusion_v2-GGUF \
 hf download tensorblock/Llama-3.3-70B-Instruct-abliterated-GGUF \
   Llama-3.3-70B-Instruct-abliterated-Q3_K_M.gguf \
   --local-dir ./models
+
+hf download ggml-org/gpt-oss-20b-GGUF \
+  gpt-oss-20b-mxfp4.gguf \
+  --local-dir ./models
