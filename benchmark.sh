@@ -38,9 +38,9 @@ get_ngl_for_model() {
     elif [[ $model == *"Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M"* ]]; then
         echo "61" # из 64 слоёв
     elif [[ $model == *"Llama_3.x_70b_L3.3-Dolphin-Eva_fusion_v2.Q3_K_L"* ]]; then
-        echo "39" # из 80 слоёв
+        echo "40" # из 80 слоёв
     elif [[ $model == *"Llama-3.3-70B-Instruct-abliterated-Q3_K_M"* ]]; then
-        echo "45" # ???
+        echo "40" # ???
     elif [[ $model == *"gpt-oss-20b-mxfp4.gguf"* ]]; then
         echo "35" # ???
     else
