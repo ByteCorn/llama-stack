@@ -34,13 +34,15 @@ get_ngl_for_model() {
 
     # Установка NGL под 24GB VRAM
     if [[ $model == *"qwen2.5-coder-32b-instruct-q5_k_m"* ]]; then
-        echo "63" # из 64 слоёв
+        echo "61" # из 64 слоёв
     elif [[ $model == *"Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M"* ]]; then
-        echo "63" # из 64 слоёв
+        echo "61" # из 64 слоёв
     elif [[ $model == *"Llama_3.x_70b_L3.3-Dolphin-Eva_fusion_v2.Q3_K_L"* ]]; then
-        echo "49" # из 80 слоёв
+        echo "40" # из 80 слоёв
+    elif [[ $model == *"Llama-3.3-70B-Instruct-abliterated-Q3_K_M"* ]]; then
+        echo "45" # ???
     elif [[ $model == *"gpt-oss-20b-mxfp4.gguf"* ]]; then
-        echo "99" # offloaded 50/81 layers
+        echo "35" # ???
     else
        echo "30"  # Для всех остальных
     fi
