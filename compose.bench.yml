@@ -6,7 +6,7 @@ x-llm-base: &llm-base
     - ./cache:/cache
     - ./corpus:/corpus:ro
     - ./results:/results
-    - ./tests.sh:/tests.sh
+    - ./benchmark.sh:/benchmark.sh
   cap_add:
     - IPC_LOCK
     - SYS_NICE # для приоритизации процессов
@@ -26,11 +26,11 @@ x-llm-base: &llm-base
       reservations:
         devices:
           - driver: nvidia
-            device_ids: ['0']
-            capabilities: [gpu, utility]
+            device_ids: [ '0' ]
+            capabilities: [ gpu, utility ]
       limits:
-        memory: 56G # дставляю 8GB для системы
-        cpus: '10.0' # фиксирую CPU
+        memory: '8G' # ставляю 8GB для системы
+        cpus: '10' # фиксирую CPU
   restart: "no"
   healthcheck:
     test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8080}/health"]
@@ -40,10 +40,10 @@ x-llm-base: &llm-base
     start_period: 60s
 
 services:
-  llama_cpp_benchmark:
+  llama-cpp-benchmark:
     <<: *llm-base
     container_name: llama_cpp_benchmark
-    entrypoint: [ "/bin/bash", "/tests.sh" ]
+    entrypoint: [ "/bin/bash", "/benchmark.sh" ]
     environment:
       # Параллелизм и потоки
       - LLAMA_ARG_THREADS=10 # потоков для вычислений

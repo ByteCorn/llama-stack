@@ -90,7 +90,11 @@ cd ..
 PYTHON_SIZE=$(wc -l < "$OUTPUT_DIR/$PYTHON_CORPUS" 2>/dev/null || echo "0")
 echo "  Готово! Строк в python_corpus.txt: $PYTHON_SIZE"
 
-# 3. ФИНАЛЬНАЯ ИНФОРМАЦИЯ
+# 3. ПОДРЕЗАЕМ РАЗМЕР КОРПУСОВ ДО 15M
+head -c 15M lean_corpus.txt > lean_corpus.txt.tmp && mv lean_corpus.txt.tmp lean_corpus.txt
+head -c 15M python_corpus.txt > python_corpus.txt.tmp && mv python_corpus.txt.tmp python_corpus.txt
+
+# 4. ФИНАЛЬНАЯ ИНФОРМАЦИЯ
 echo ""
 echo "========================================="
 echo "Создание корпусов завершено!"

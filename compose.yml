@@ -4,11 +4,51 @@ x-logging-gelf: &gelf-logging
     options:
       # Используем host.docker.internal вместо жесткого IP
       gelf-address: "udp://127.0.0.1:12201" # Graylog порт из стека логирования
-      tag: "llm-bench-{{.Name}}" # автоматически добавит имя контейнера в тег
+      tag: "llm-{{.Name}}" # автоматически добавит имя контейнера в тег
+
+x-llm-base: &llm-base
+  image: ghcr.io/ggml-org/llama.cpp:server-cuda
+  user: "${UID:-1000}:${GID:-1000}"
+  volumes:
+    - ./models:/models:ro
+    - ./cache:/cache
+  cap_add:
+    - IPC_LOCK
+    - SYS_NICE # для приоритизации процессов
+  ulimits:
+    memlock:
+      soft: -1
+      hard: -1
+    nproc:
+      soft: 65535
+      hard: 65535
+  shm_size: "4gb" # оптимально для 16k контекста
+  security_opt:
+    - label=disable
+    - seccomp=unconfined
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            device_ids: [ '0' ]
+            capabilities: [ gpu, utility ]
+      limits:
+        memory: '8G' # ставляю 8GB для системы
+        cpus: '10' # фиксирую CPU
+  restart: "no"
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8080}/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 60s
+
 services:
-  llama_cpp:
+
+  llama-cpp:
+    <<: *llm-base
     <<: *gelf-logging
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
     environment:
       # Конфигурация сервера
       - LLAMA_ARG_HOST=0.0.0.0 # сервер слушает на всех интерфейсах
@@ -18,40 +58,38 @@ services:
       - LLAMA_ARG_MODEL=/models/Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M.gguf # путь к модели
       - LLAMA_ARG_ALIAS=qwencoder # псевдоним модели
       # Параллелизм и потоки
-      - LLAMA_ARG_THREADS=12 # потоков для вычислений
-      - LLAMA_ARG_THREADS_BATCH=12 # потоков для пакетной обработки
-      - LLAMA_ARG_N_PARALLEL=4 # параллельных запросов
+      - LLAMA_ARG_THREADS=10 # потоков для вычислений
+      - LLAMA_ARG_THREADS_BATCH=10 # потоков для пакетной обработки
+      - LLAMA_ARG_N_PARALLEL=2 # параллельных запросов
       # Контекст и память
-      - LLAMA_ARG_CTX_SIZE=32768 # размер контекста
-      - LLAMA_ARG_NO_MMAP=false # используем маппинг файлов в память
-      # GPU настройки
-      - LLAMA_ARG_N_GPU_LAYERS=99 # загружаем 38 слоёв модели на GPU
-      # Дополнительные настройки
-      - LLAMA_ARG_NO_KV_OFFLOAD=false # включаем offload KV для лучшего использования GPU
+      - LLAMA_ARG_CTX_SIZE=4096 # размер контекста
+      - LLAMA_ARG_MMAP=true # используем маппинг файлов в память
       - LLAMA_ARG_MLOCK=true # форсимируем систему держать модель в RAM, чтобы избежать свопинга и сжатия
+      - LLAMA_ARG_N_PREDICT=-1 # контролирует максимальное количество токенов для генерации. значение -1 означает «без ограничений»
+      # Настройки батчинга
+      - LLAMA_ARG_BATCH=512 # максимальный логический размер батча, оптимальный для 24GB VRAM(по умолчанию: 2048)
+      - LLAMA_ARG_UBATCH=256 # максимальный физический размер батча, микропакеты для стабильности(по умолчанию: 512)
+      # GPU настройки
+      - LLAMA_ARG_N_GPU_LAYERS=auto # автоопределение загрузки слоёв модели на GPU
+      - LLAMA_ARG_MAIN_GPU=0 # явно указываем GPU
+      - LLAMA_ARG_TENSOR_SPLIT=0 # все тензоры на одну карту
+      - LLAMA_ARG_KV_OFFLOAD=true # включаем offload KV для лучшего использования GPU
       # Дополнительные оптимизации
       - LLAMA_ARG_FLASH_ATTN=auto # используем Flash Attention, если поддерживается
       - LLAMA_ARG_KV_UNIFIED=true # единый буфер кэша KV для всех последовательностей
-    volumes:
-      - ./llama_cpp_models:/models
-      - ./llama_cpp_cache:/build/cache
+      - LLAMA_ARG_FIT=on # подгонять параметры, чтобы модель точно влезла в память GPU 
+      - LLAMA_ARG_NO_HOST=true # обход буфера хоста, позволяющий использовать дополнительные буферы
+      - LLAMA_ARG_PERF=true # включить вывод внутренних метрик производительности
+      - LLAMA_ARG_REPACK=true # включить перепаковку весов модели при загрузке
+      # Прецизионные настройки
+      - LLAMA_ARG_CACHE_TYPE_K=f16 # ключи в float16
+      - LLAMA_ARG_CACHE_TYPE_V=f16 # значения в float16
+      # Стратегия кеширования
+      - LLAMA_ARG_SPLIT_MODE=none # разделить модель между несколькими графическими процессорами
+      # Оптимизации производительности
+      - GGML_CUDA_MMQ_Y=1 # включаем оптимизированные матричные умножения
+      - GGML_CUDA_FORCE_MMQ=1 # форсируем MMQ для максимальной скорости
+      - CUDA_VISIBLE_DEVICES=0 # явно указываем GPU
     ports:
       - "8080:8080"
-    cap_add:
-      - IPC_LOCK
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    shm_size: "64gb"
-    security_opt:
-      - label=disable
-      - seccomp=unconfined
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [ gpu ]
     restart: unless-stopped

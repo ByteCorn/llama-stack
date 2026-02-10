@@ -18,25 +18,34 @@ echo "🖥  ДИАГНОСТИКА СИСТЕМЫ"
 echo "Хост: $(hostname)"
 echo "CPU: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs)"
 echo "Память: $(grep 'MemTotal' /proc/meminfo | awk '{print $2/1024/1024 " GB"}')"
-nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
+nvidia-smi --query-gpu=name,memory.total,memory.free,memory.used,driver_version --format=csv
 
-# ==================== ФИКСИРОВАННЫЕ ПАРАМЕТРЫ ===================
-# РУЧНАЯ НАСТРОЙКА ПОД ТВОЮ СИСТЕМУ (МЕНЯЙ ЗДЕСЬ)
-CTX=16384
-BATCH=512
-THREADS=10
+# ==================== ПОДБОР ПАРАМЕТРОВ =========================
+# Используем контекст из Docker Compose. Если не задан, ставим безопасные 8192.
+CTX="${LLAMA_ARG_CTX_SIZE:-8192}"
+NGL="${LLAMA_ARG_N_GPU_LAYERS:-auto}"
+
+# Потоки из переменных окружения или дефолт
+THREADS="${LLAMA_ARG_THREADS:-10}"
 
 # Эвристика для NGL на основе имени модели
 get_ngl_for_model() {
     local model=$1
-    local model_lower=$(echo "$model" | tr '[:upper:]' '[:lower:]')
-    
-    if [[ "$model_lower" == *"70b"* ]]; then
-        echo "45"  # Для 70B моделей на 24 ГБ VRAM
-    elif [[ "$model_lower" == *"32b"* ]] || [[ "$model_lower" == *"33b"* ]]; then
-        echo "75"  # Для 32B/33B моделей
+
+    # Установка NGL под 24GB VRAM
+    if [[ $model == *"qwen2.5-coder-32b-instruct-q5_k_m"* ]]; then
+        echo "61" # Для 32B моделей
+    elif [[ $model == *"Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M"* ]]; then
+        echo "61" # Для 32B моделей
+    elif [[ $model == *"70b"* || $model == *"70B"* ]]; then
+        # Для более тяжелой версии (Q3_K_L) чуть меньше слоев
+        if [[ $model == *"Q3_K_L"* ]]; then
+            echo "40" # Для 70B моделей на 24 ГБ VRAM
+        else
+            echo "45" # Для 70B моделей на 24 ГБ VRAM
+        fi
     else
-        echo "99"  # Для всех остальных (почти все слои на GPU)
+       echo "33"  # Для всех остальных
     fi
 }
 
@@ -46,22 +55,22 @@ run_benchmark() {
     local ngl=$2
     local timestamp=$(date +%Y%m%d_%H%M%S)
     local log_file="${RESULTS_DIR}/bench_${model}_${timestamp}.log"
-    
+
     echo "🧪 ТЕСТ СКОРОСТИ: $model (NGL=$ngl)"
-    
+
     # Запускаем llama-bench с безопасными параметрами
-    timeout 300 "${BIN_DIR}/llama-bench" \
+    ${BIN_DIR}/llama-bench \
         -m "${MODEL_DIR}/${model}" \
-        -c ${CTX} \
-        -n 256 \
+        -p ${CTX} \
         -ngl ${ngl} \
         -t ${THREADS} \
-        -fa \
+        -fa auto \
         --verbose 2>&1 | tee "$log_file" || {
             echo "⚠️  Бенчмарк завершился с ошибкой или таймаутом"
-            return 1
+            echo ""
+            # Продолжаем тесты, несмотря на ошибку
         }
-    
+
     # Простая проверка успешности
     if tail -5 "$log_file" | grep -q "t/s"; then
         echo "✅ Бенчмарк завершён"
@@ -78,23 +87,24 @@ run_perplexity() {
     local timestamp=$(date +%Y%m%d_%H%M%S)
     local corpus_name=$(basename "$corpus" .txt)
     local log_file="${RESULTS_DIR}/ppl_${model}_${corpus_name}_${timestamp}.log"
-    
+
     echo "📚 PERPLEXITY: $model → $corpus_name"
-    
+
     # Используем --chunks 0 для быстрого теста (полный расчёт)
-    timeout 600 "${BIN_DIR}/llama-perplexity" \
+    ${BIN_DIR}/llama-perplexity \
         -m "${MODEL_DIR}/${model}" \
         -f "$corpus" \
         -c ${CTX} \
         -ngl ${ngl} \
         -t ${THREADS} \
-        -fa \
+        -fa auto \
         --chunks 0 \
         --verbose 2>&1 | tee "$log_file" || {
             echo "⚠️  Perplexity тест завершился с ошибкой или таймаутом"
-            return 1
+            echo ""
+            # Продолжаем тесты, несмотря на ошибку
         }
-    
+
     # Извлекаем результат
     if grep -q "Final estimate:" "$log_file"; then
         local ppl=$(grep "Final estimate:" "$log_file" | tail -1 | grep -o "PPL = [0-9.]*" | cut -d' ' -f3)
@@ -106,9 +116,9 @@ run_perplexity() {
 
 # ==================== ОСНОВНОЙ ЦИКЛ =============================
 main() {
-    # СПИСОК МОДЕЛЕЙ (оставь только те, которые есть в папке /models)
+    # СПИСОК МОДЕЛЕЙ
     local models=()
-    
+
     # Автоматически находим все .gguf файлы
     for model_file in "$MODEL_DIR"/*.gguf; do
         if [[ -f "$model_file" ]]; then
