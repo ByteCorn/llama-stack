@@ -53,6 +53,7 @@ services:
       - LLAMA_ARG_HOST=0.0.0.0 # сервер слушает на всех интерфейсах
       - LLAMA_ARG_PORT=8080 # порт для подключения
       - LLAMA_ARG_THREADS_HTTP=16 # количество потоков для обработки HTTP-запросов
+      - LLAMA_ARG_JINJA=1
       # Конфигурация модели
       - LLAMA_ARG_MODEL=/models/Qwen2.5-Coder-32B-Instruct-abliterated-Q5_K_M.gguf # путь к модели
       - LLAMA_ARG_ALIAS=qwencoder # псевдоним модели
@@ -61,7 +62,7 @@ services:
       - LLAMA_ARG_THREADS_BATCH=10 # потоков для пакетной обработки
       - LLAMA_ARG_N_PARALLEL=2 # параллельных запросов
       # Контекст и память
-      # - LLAMA_ARG_CTX_SIZE=4096 # размер контекста
+      - LLAMA_ARG_CTX_SIZE=32768 # размер контекста
       - LLAMA_ARG_MMAP=true # используем маппинг файлов в память
       - LLAMA_ARG_MLOCK=true # форсимируем систему держать модель в RAM, чтобы избежать свопинга и сжатия
       - LLAMA_ARG_N_PREDICT=-1 # контролирует максимальное количество токенов для генерации. значение -1 означает «без ограничений»
@@ -90,6 +91,7 @@ services:
       - GGML_CUDA_MMQ_Y=1 # включаем оптимизированные матричные умножения
       - GGML_CUDA_FORCE_MMQ=1 # форсируем MMQ для максимальной скорости
       - CUDA_VISIBLE_DEVICES=0 # явно указываем GPU
+    ntrypoint: /app/llama-server ${LLAMACPP_SERVER_ARGS}
     ports:
       - "8080:8080"
     restart: unless-stopped
