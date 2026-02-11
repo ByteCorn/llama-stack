@@ -91,7 +91,6 @@ services:
       - GGML_CUDA_MMQ_Y=1 # включаем оптимизированные матричные умножения
       - GGML_CUDA_FORCE_MMQ=1 # форсируем MMQ для максимальной скорости
       - CUDA_VISIBLE_DEVICES=0 # явно указываем GPU
-    ntrypoint: /app/llama-server ${LLAMACPP_SERVER_ARGS}
     ports:
       - "8080:8080"
     restart: unless-stopped
